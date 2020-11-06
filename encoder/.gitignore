@@ -5,3 +5,4 @@ output.raw
 *.o
 encoder
 encoded.bin
+encoded.bin.xz

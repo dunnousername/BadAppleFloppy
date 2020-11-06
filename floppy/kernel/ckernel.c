@@ -4,7 +4,7 @@
 #include "common.h"
 #include "memfuncs.h"
 
-#include "puff.h"
+#include "xz.h"
 #include "decode.h"
 #include "vga.h"
 
@@ -48,16 +48,16 @@ static int process_deflate_error(int ret);
 
 #define MEGABYTE (1024 * 1024)
 
-#define DECOMPRESSED_START FLOPPY_END
-#define DECOMPRESSED_SIZE (MEGABYTE * 12)
-#define DECOMPRESSED_END (DECOMPRESSED_START + DECOMPRESSED_SIZE)
-
-#define SCRATCH_START DECOMPRESSED_END
+#define SCRATCH_START FLOPPY_END
 #define SCRATCH_SIZE (MAX_X * MAX_Y)
 #define SCRATCH_END (SCRATCH_START + SCRATCH_SIZE)
 #define SCRATCH_PTR (SCRATCH_START)
 #define SCRATCH_PTR2 (SCRATCH_END)
 #define SCRATCH2_END (SCRATCH_PTR2 + SCRATCH_SIZE)
+
+#define DECOMPRESSED_START SCRATCH2_END
+#define DECOMPRESSED_SIZE (MEGABYTE * 24)
+#define DECOMPRESSED_END (DECOMPRESSED_START + DECOMPRESSED_SIZE)
 
 uint8_t *music_ptr = ba_music;
 
@@ -273,16 +273,37 @@ void keyboard_event() {
 }
 
 void try_deflate() {
-    unsigned long actual_length = DECOMPRESSED_SIZE;
-    unsigned long actual_compressed_length = CHAIN_DEFLATE_BIN_LENGTH;
-    int puff_ret = puff(DECOMPRESSED_START, &actual_length, CHAIN_DEFLATE_BIN_START, &actual_compressed_length);
-    
-    if (!process_deflate_error(puff_ret)) {
+    struct xz_buf buf;
+    enum xz_ret ret = xz_decompress(
+        CHAIN_DEFLATE_BIN_START,
+        CHAIN_DEFLATE_BIN_LENGTH,
+        DECOMPRESSED_START,
+        DECOMPRESSED_SIZE,
+        MEGABYTE * 2,
+        &buf
+    );
+
+    char* codes[] = {
+        "XZ_OK",
+        "XZ_STREAM_END",
+        "XZ_UNSUPPORTED_CHECK",
+        "XZ_MEM_ERROR",
+        "XZ_MEMLIMIT_ERROR",
+        "XZ_FORMAT_ERROR",
+        "XZ_OPTIONS_ERROR",
+        "XZ_DATA_ERROR",
+        "XZ_BUF_ERROR"
+    };
+
+    if (ret == XZ_OK) {
         debug_msg("Decompression was successful.");
         return;
     }
     
-    panic_msg("Decompression was not successful.");
+    info_msg("Decompression not successful. Error code:");
+    info_msg(codes[ret]);
+
+    panic_msg("Decompression failed.");
 }
 
 void panic() {

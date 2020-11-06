@@ -1,0 +1,4 @@
+This is a public domain embedded implementation of an XZ decompressor written mostly by Lasse Collin.
+It also contains some modifications made by me.
+
+It can also be found here: https://tukaani.org/xz/embedded.html

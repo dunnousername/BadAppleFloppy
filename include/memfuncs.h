@@ -6,6 +6,20 @@
 void info_msg(char *msg);
 
 #ifdef BUILD_IMAGE
+int memcmp(void *str1, void *str2, long n) {
+    uint8_t *x = (uint8_t *)str1;
+    uint8_t *y = (uint8_t *)str2;
+    for (long i = 0; i < n; i++) {
+        if (x[i] == y[i]) {
+            continue;
+        }
+        
+        return (x[i] > y[i]) ? 1 : -1;
+    }
+
+    return 0;
+}
+
 void *memcpy(void *dest, const void *src, long n) {
 #ifndef USE_ASM
     for (long i = 0; i < n; i++) {
@@ -27,6 +41,10 @@ void *memcpy(void *dest, const void *src, long n) {
 
     return dest;
 #endif
+}
+
+void *memmove(void *dest, const void *src, long n) {
+    memcpy(dest, src, n);
 }
 
 void *memset(void *s, int c, long n) {

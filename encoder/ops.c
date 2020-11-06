@@ -316,7 +316,7 @@ chain_t *find_all_chains(int *labeled, int labeled_len) {
         size_t len = 0;
         uint8_t *chain = find_chain2(tmp, &start_x, &start_y, &len);
         if (chain) {
-            num_chains = _write_optimized_chains(&chains[num_chains], chain, start_x, start_y, len);
+            num_chains += _write_optimized_chains(&chains[num_chains], chain, start_x, start_y, len);
             /*
             chains[num_chains].chain = chain;
             chains[num_chains].start_x = start_x;

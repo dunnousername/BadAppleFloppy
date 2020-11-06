@@ -41,9 +41,17 @@ uint8_t *do_encoding(uint8_t *frame, size_t *len) {
     uint8_t inverted[FRAME_SIZE];
     uint8_t encoded[16384] = {0};
     uint8_t *ptr = encoded;
+    uint8_t color1 = 0xff;
+    uint8_t color2 = 0x55;
+    if (frame[0]) {
+        invert(frame, frame);
+        uint8_t tmp = color1;
+        color1 = color2;
+        color2 = tmp;
+    }
     invert(frame, inverted);
-    ptr = write_chains(frame, 0xff, ptr);
-    ptr = write_chains(inverted, 0x55, ptr);
+    ptr = write_chains(frame, color1, ptr);
+    ptr = write_chains(inverted, color2, ptr);
     *ptr++ = 0;
     /*
     uint8_t points[1024*2] = {0};
