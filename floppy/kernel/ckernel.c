@@ -221,41 +221,7 @@ void update_frame() {
     kstrdec(frame_msg, state.frame);
     debug_msg(frame_msg);
 
-    memset(SCRATCH_PTR, 0, SCRATCH_SIZE);
-    memset(SCRATCH_PTR2, 0, SCRATCH_SIZE);
-
-    int x = 0;
-    int y = 0;
-    int16_t startx = -1;
-    int16_t starty = -1;
-    int16_t lastx = -1;
-    int16_t lasty = -1;
-    int which_path = 0;
-    while (decoder(&state) != STATE_FLOODFILL) {
-        if (state.prevstate == STATE_ENDPATH) {
-            SCRATCH_PTR[sidx(state.x, state.y)] = 0xFF;
-            startx = state.x;
-            starty = state.y;
-        } else if (state.prevstate == STATE_INPATH) {
-            SCRATCH_PTR[sidx(state.x, state.y)] = 0xFF; /* state.dy > 0 ? 0xFE : (state.dy == 0 ? 0xFF : 0xEF); */
-            SCRATCH_PTR2[sidx(state.x, state.y)] = which_path;
-            
-            lastx = state.x;
-            lasty = state.y;
-        } else {
-            which_path++;
-        }
-    }
-
-    while (decoder(&state) != STATE_ENDFRAME) {
-        if (state.prevstate == STATE_INFLOODFILL) {
-            debug_msg("flooding");
-            floodfill(SCRATCH_PTR, state.y, state.x);
-#ifdef DEBUG
-            SCRATCH_PTR[sidx(state.y, state.x)] = 0b10101010;
-#endif
-        }
-    }
+    render(SCRATCH_PTR, &state);
 
     copy_to_vmem(SCRATCH_PTR);
 

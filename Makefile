@@ -1,4 +1,4 @@
-.PHONY: all clean floppy clean.floppy encoder clean.encoder run.encoder
+.PHONY: all clean floppy clean.floppy encoder clean.encoder run.encoder distclean.encoder
 all: floppy encoder
 
 CFLAGS = $(CFLAGS) -target i386-pc-none-elf
@@ -20,4 +20,9 @@ clean.encoder:
 run.encoder: encoder
 	$(MAKE) -C encoder run
 
+distclean.encoder:
+	$(MAKE) -C encoder distclean
+
 clean: clean.floppy clean.encoder
+
+distclean: clean distclean.encoder

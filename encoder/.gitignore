@@ -1,0 +1,7 @@
+input.raw
+output.raw
+*.pdb
+*.ilk
+*.o
+encoder
+encoded.bin

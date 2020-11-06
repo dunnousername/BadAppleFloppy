@@ -1,11 +1,11 @@
 #ifndef DECODE_H
 #define DECODE_H
 
+#include "constants.h"
+
 #include <stdint.h>
 #include "memfuncs.h"
 
-#define MAX_X (320)
-#define MAX_Y (240)
 #define REAL_MAX_Y (200)
 
 #define IDX(x,y) ((y)*MAX_X+(x))
@@ -20,9 +20,11 @@ void floodfill(uint8_t *p, int16_t x, int16_t y);
  * safe index
  */
 long sidx(long x, long y) {
+    #ifdef BUILD_IMAGE
     if ((x >= MAX_X) || (x < 0) || (y >= MAX_Y) || (y < 0)) {
         panic_msg("2D array index not in range");
     }
+    #endif
 
     return IDX(x, y);
 }
@@ -38,6 +40,23 @@ uint8_t *read_varint(uint8_t *ptr, int16_t *out) {
         *out = lsb & 63;
     }
 
+    return ptr;
+}
+
+uint8_t *write_varint(uint8_t *ptr, int16_t in) {
+    if ((in >= 0) && (in <= 63)) {
+        *ptr++ = in & 63;
+        return ptr;
+    }
+
+    uint8_t flags = 64;
+    if (in < 0) {
+        flags |= 128;
+        in = -in;
+    }
+
+    *ptr++ = flags | (in & 63);
+    *ptr++ = (in >> 6) & 0xff;
     return ptr;
 }
 
@@ -70,6 +89,10 @@ void copy_to_vmem(uint8_t *src) {
     }
 }
 
+/* http://www.cs.unca.edu/~reiser/imaging/chaincode.html */
+static int16_t direction_dx[8] = {-1,  0,  1,  1,  1,  0, -1, -1};
+static int16_t direction_dy[8] = {-1, -1, -1,  0,  1,  1,  1,  0};
+
 /*
  * move in an encoded direction
  */
@@ -78,6 +101,7 @@ void move_direction(int16_t *x, int16_t *y, char dir) {
     
     /* 0000 NSWE */
 
+    /*
     #define NORTH(a) ((a) & 8)
     #define SOUTH(a) ((a) & 4)
     #define  WEST(a) ((a) & 2)
@@ -85,23 +109,28 @@ void move_direction(int16_t *x, int16_t *y, char dir) {
 
     int16_t dx = WEST (dir) ? -1 : (EAST (dir) ? 1 : 0);
     int16_t dy = NORTH(dir) ? -1 : (SOUTH(dir) ? 1 : 0);
+    */
+
+    int16_t dx = direction_dx[dir];
+    int16_t dy = direction_dy[dir];
 
     *x += dx;
     *y += dy;
 
+    /*
     #undef NORTH
     #undef SOUTH
     #undef WEST
     #undef EAST
+    */
 }
 
 #define STATE_START        0
 #define STATE_INPATH       1
 #define STATE_ENDPATH      2
 #define STATE_ENDFRAME     3
-#define STATE_FLOODFILL    4
-#define STATE_INFLOODFILL  5
-#define STATE_DONE         6
+#define STATE_BEGINFRAME   4
+#define STATE_DONE         5
 
 typedef struct decoder_state_t {
     uint8_t state;
@@ -115,37 +144,43 @@ typedef struct decoder_state_t {
     int16_t length;
     uint8_t *endptr;
     uint8_t *beginptr;
+    uint8_t color;
 } decoder_state_t;
-
-#define MAX_FRAME 7777
 
 uint8_t decoder(decoder_state_t *s) {
     s->prevstate = s->state;
     switch (s->state) {
         case STATE_START:;
             s->frame = 0;
+            s->color = 0xFF;
             if (s->beginptr) {
                 s->ptr = s->beginptr;
             } else {
                 s->beginptr = s->ptr;
             }
-            s->state = STATE_ENDFRAME;
+            s->state = STATE_BEGINFRAME;
             break;
         case STATE_ENDFRAME:;
             if (s->frame == MAX_FRAME) {
                 s->state = STATE_DONE;
                 break;
             }
+            s->state = STATE_BEGINFRAME;
+            break;
+        case STATE_BEGINFRAME:;
             s->state = STATE_ENDPATH;
+            s->x = -1;
+            s->y = -1;
             break;
         case STATE_ENDPATH:;
             uint8_t tmp = s->ptr[0];
             s->ptr = &s->ptr[1];
             if (tmp == 0x00) {
-                s->state = STATE_FLOODFILL;
-                /* s->frame++; */
+                s->state = STATE_ENDFRAME;/* STATE_FLOODFILL; */
+                s->frame++;
                 break;
             }
+            s->color = tmp;
             s->ptr = read_varint(s->ptr, &s->x);
             s->ptr = read_varint(s->ptr, &s->y);
             s->dx = 0;
@@ -175,6 +210,7 @@ uint8_t decoder(decoder_state_t *s) {
         case STATE_DONE:;
             s->state = STATE_START;
             break;
+        /*
         case STATE_FLOODFILL:;
             s->ptr = read_varint(s->ptr, &s->length);
             s->state = STATE_INFLOODFILL;
@@ -189,6 +225,7 @@ uint8_t decoder(decoder_state_t *s) {
             s->ptr = read_varint(s->ptr, &s->y);
             s->length--;
             break;
+        */
     }
 
     return s->state;
@@ -254,6 +291,36 @@ void floodfill(uint8_t *p, int16_t x, int16_t y) {
     for (;pointslen; pointslen--) {
         floodfill(p, pointsx[pointslen - 1], pointsy[pointslen - 1]);
     }
+}
+
+void render(uint8_t *scratch_ptr, decoder_state_t *state) {
+    memset(scratch_ptr, 0, FRAME_SIZE);
+
+    int x = 0;
+    int y = 0;
+
+    while (state->state != STATE_BEGINFRAME) {
+        decoder(state);
+    }
+
+    while (decoder(state) != STATE_BEGINFRAME) {
+        if ((state->prevstate == STATE_ENDPATH) || (state->prevstate == STATE_INPATH)) {
+            if ((state->x >= 0) && (state->y >= 0)) {
+                scratch_ptr[sidx(state->x, state->y)] = state->color;
+            }
+        }
+    }
+
+    /*
+    while (decoder(state) != STATE_ENDFRAME) {
+        if (state->prevstate == STATE_INFLOODFILL) {
+            #if 0
+            debug_msg("flooding");
+            floodfill(scratch_ptr, state->x, state->y);
+            #endif
+        }
+    }
+    */
 }
 
 #endif
