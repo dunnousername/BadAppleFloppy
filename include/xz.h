@@ -11,6 +11,9 @@
 #ifndef XZ_H
 #define XZ_H
 
+extern void info_msg(char *msg);
+extern void print_stack(void);
+
 #ifdef __KERNEL__
 #	include <linux/stddef.h>
 #	include <linux/types.h>

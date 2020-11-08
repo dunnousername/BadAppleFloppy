@@ -9,6 +9,7 @@
 #include "vga.h"
 
 __attribute__((cdecl)) extern void _debug_msg(char *msg);
+__attribute__((cdecl)) extern uint32_t get_esp(void);
 __attribute__((cdecl)) extern void do_sti(void);
 __attribute__((cdecl)) extern void do_cli(void);
 __attribute__((cdecl)) extern void _halt(void);
@@ -25,8 +26,8 @@ extern uint8_t ba_music[];
 extern uint8_t ba_music_end[];
 extern uint32_t ba_music_len;
 
-#define CHAIN_DEFLATE_BIN_START ((uint8_t *) _binary_chain_deflate_bin_start + 2)
-#define CHAIN_DEFLATE_BIN_END ((uint8_t *) _binary_chain_deflate_bin_end - 4)
+#define CHAIN_DEFLATE_BIN_START ((uint8_t *) _binary_chain_deflate_bin_start)
+#define CHAIN_DEFLATE_BIN_END ((uint8_t *) _binary_chain_deflate_bin_end)
 #define CHAIN_DEFLATE_BIN_LENGTH (((long) CHAIN_DEFLATE_BIN_END) - ((long) CHAIN_DEFLATE_BIN_START))
 
 void panic(void);
@@ -37,6 +38,7 @@ void keyboard_event(void);
 void update_frame(void);
 void debug_msg(char *msg);
 void info_msg(char *msg);
+void print_stack(void);
 static void try_deflate();
 static int process_deflate_error(int ret);
 
@@ -56,7 +58,7 @@ static int process_deflate_error(int ret);
 #define SCRATCH2_END (SCRATCH_PTR2 + SCRATCH_SIZE)
 
 #define DECOMPRESSED_START SCRATCH2_END
-#define DECOMPRESSED_SIZE (MEGABYTE * 24)
+#define DECOMPRESSED_SIZE (MEGABYTE * 12)
 #define DECOMPRESSED_END (DECOMPRESSED_START + DECOMPRESSED_SIZE)
 
 uint8_t *music_ptr = ba_music;
@@ -130,7 +132,7 @@ volatile int update_time = 0;
 #define STARTUP_NOTICE (BAD_APPLE LEO COPYRIGHT VERSION_TEXT)
 
 __attribute__((cdecl)) void kernel_main() {
-    debug_msg("entered kernel_main()");
+    debug_msg("Entered kernel_main()");
     info_msg(STARTUP_NOTICE);
 
     set_text_mode();
@@ -150,7 +152,6 @@ __attribute__((cdecl)) void kernel_main() {
 
     set_graphics_mode();
 
-    debug_msg("attempting decompression...");
     try_deflate();
 
     music_ptr = ba_music;
@@ -176,6 +177,11 @@ __attribute__((cdecl)) void kernel_main() {
 
     debug_msg("reached end of kernel_main()");
     panic();
+}
+
+void print_stack() {
+    info_msg("esp:");
+    print_u32h(get_esp());
 }
 
 void debug_msg(char *msg) {
@@ -273,6 +279,7 @@ void keyboard_event() {
 }
 
 void try_deflate() {
+    info_msg("Attempting decompression...");
     struct xz_buf buf;
     enum xz_ret ret = xz_decompress(
         CHAIN_DEFLATE_BIN_START,
@@ -295,8 +302,8 @@ void try_deflate() {
         "XZ_BUF_ERROR"
     };
 
-    if (ret == XZ_OK) {
-        debug_msg("Decompression was successful.");
+    if (ret == XZ_STREAM_END) {
+        info_msg("Decompression was successful.");
         return;
     }
     

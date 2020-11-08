@@ -479,7 +479,7 @@ static enum xz_ret dec_block_header(struct xz_dec *s)
 	if (xz_crc32(s->temp.buf, s->temp.size, 0)
 			!= get_le32(s->temp.buf + s->temp.size))
 		return XZ_DATA_ERROR;
-
+	info_msg("0");
 	s->temp.pos = 2;
 
 	/*
@@ -492,7 +492,7 @@ static enum xz_ret dec_block_header(struct xz_dec *s)
 	if (s->temp.buf[1] & 0x3F)
 #endif
 		return XZ_OPTIONS_ERROR;
-
+	info_msg("1");
 	/* Compressed Size */
 	if (s->temp.buf[1] & 0x40) {
 		if (dec_vli(s, s->temp.buf, &s->temp.pos, s->temp.size)
@@ -503,7 +503,7 @@ static enum xz_ret dec_block_header(struct xz_dec *s)
 	} else {
 		s->block_header.compressed = VLI_UNKNOWN;
 	}
-
+	info_msg("2");
 	/* Uncompressed Size */
 	if (s->temp.buf[1] & 0x80) {
 		if (dec_vli(s, s->temp.buf, &s->temp.pos, s->temp.size)
@@ -514,6 +514,7 @@ static enum xz_ret dec_block_header(struct xz_dec *s)
 	} else {
 		s->block_header.uncompressed = VLI_UNKNOWN;
 	}
+	info_msg("3");
 
 #ifdef XZ_DEC_BCJ
 	/* If there are two filters, the first one must be a BCJ filter. */
@@ -551,19 +552,20 @@ static enum xz_ret dec_block_header(struct xz_dec *s)
 	if (s->temp.size - s->temp.pos < 1)
 		return XZ_DATA_ERROR;
 
+	info_msg("4");
 	ret = xz_dec_lzma2_reset(s->lzma2, s->temp.buf[s->temp.pos++]);
 	if (ret != XZ_OK)
 		return ret;
-
+	info_msg("5");
 	/* The rest must be Header Padding. */
 	while (s->temp.pos < s->temp.size)
 		if (s->temp.buf[s->temp.pos++] != 0x00)
 			return XZ_OPTIONS_ERROR;
-
+	info_msg("6");
 	s->temp.pos = 0;
 	s->block.compressed = 0;
 	s->block.uncompressed = 0;
-
+	info_msg("7");
 	return XZ_OK;
 }
 
@@ -576,10 +578,11 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 	 * of the Index field.
 	 */
 	s->in_start = b->in_pos;
-
+	print_stack();
 	while (true) {
 		switch (s->sequence) {
 		case SEQ_STREAM_HEADER:
+			info_msg("SEQ_STREAM_HEADER");
 			/*
 			 * Stream Header is copied to s->temp, and then
 			 * decoded from there. This way if the caller
@@ -605,6 +608,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 				return ret;
 
 		case SEQ_BLOCK_START:
+			info_msg("SEQ_BLOCK_START");
 			/* We need one byte of input to continue. */
 			if (b->in_pos == b->in_size)
 				return XZ_OK;
@@ -628,16 +632,18 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			s->sequence = SEQ_BLOCK_HEADER;
 
 		case SEQ_BLOCK_HEADER:
+			info_msg("SEQ_BLOCK_HEADER");
 			if (!fill_temp(s, b))
 				return XZ_OK;
-
+			info_msg("p");
 			ret = dec_block_header(s);
+			info_msg("q");
 			if (ret != XZ_OK)
 				return ret;
-
 			s->sequence = SEQ_BLOCK_UNCOMPRESS;
 
 		case SEQ_BLOCK_UNCOMPRESS:
+			info_msg("SEQ_BLOCK_UNCOMPRESS");
 			ret = dec_block(s, b);
 			if (ret != XZ_STREAM_END)
 				return ret;
@@ -645,6 +651,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			s->sequence = SEQ_BLOCK_PADDING;
 
 		case SEQ_BLOCK_PADDING:
+			info_msg("SEQ_BLOCK_PADDING");
 			/*
 			 * Size of Compressed Data + Block Padding
 			 * must be a multiple of four. We don't need
@@ -665,6 +672,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			s->sequence = SEQ_BLOCK_CHECK;
 
 		case SEQ_BLOCK_CHECK:
+			info_msg("SEQ_BLOCK_CHECK");
 			if (s->check_type == XZ_CHECK_CRC32) {
 				ret = crc_validate(s, b, 32);
 				if (ret != XZ_STREAM_END)
@@ -685,6 +693,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			break;
 
 		case SEQ_INDEX:
+			info_msg("SEQ_INDEX");
 			ret = dec_index(s, b);
 			if (ret != XZ_STREAM_END)
 				return ret;
@@ -692,6 +701,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			s->sequence = SEQ_INDEX_PADDING;
 
 		case SEQ_INDEX_PADDING:
+			info_msg("SEQ_INDEX_PADDING");
 			while ((s->index.size + (b->in_pos - s->in_start))
 					& 3) {
 				if (b->in_pos == b->in_size) {
@@ -714,6 +724,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			s->sequence = SEQ_INDEX_CRC32;
 
 		case SEQ_INDEX_CRC32:
+			info_msg("SEQ_INDEX_CRC32");
 			ret = crc_validate(s, b, 32);
 			if (ret != XZ_STREAM_END)
 				return ret;
@@ -722,6 +733,7 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 			s->sequence = SEQ_STREAM_FOOTER;
 
 		case SEQ_STREAM_FOOTER:
+			info_msg("SEQ_STREAM_FOOTER");
 			if (!fill_temp(s, b))
 				return XZ_OK;
 
@@ -733,8 +745,12 @@ static enum xz_ret dec_main(struct xz_dec *s, struct xz_buf *b)
 }
 
 XZ_EXTERN enum xz_ret xz_decompress(void *where, size_t size, void *out, size_t out_size, uint32_t dict_max, struct xz_buf *buf) {
+	xz_crc32_init();
+	
 	struct xz_dec dec;
-	xz_dec_init(XZ_SINGLE, dict_max, &dec);
+	if (!xz_dec_init(XZ_SINGLE, dict_max, &dec)) {
+		info_msg("warning: xz_dec_init may have failed.");
+	}
 
 	buf->in = where;
 	buf->in_pos = 0;
@@ -742,6 +758,9 @@ XZ_EXTERN enum xz_ret xz_decompress(void *where, size_t size, void *out, size_t 
 	buf->out = out;
 	buf->out_pos = 0;
 	buf->out_size = out_size;
+
+	print_stack();
+
 	return xz_dec_run(&dec, buf);
 }
 
@@ -778,11 +797,9 @@ XZ_EXTERN enum xz_ret xz_dec_run(struct xz_dec *s, struct xz_buf *b)
 
 	if (DEC_IS_SINGLE(s->mode))
 		xz_dec_reset(s);
-
 	in_start = b->in_pos;
 	out_start = b->out_pos;
 	ret = dec_main(s, b);
-
 	if (DEC_IS_SINGLE(s->mode)) {
 		if (ret == XZ_OK)
 			ret = b->in_pos == b->in_size
@@ -802,7 +819,7 @@ XZ_EXTERN enum xz_ret xz_dec_run(struct xz_dec *s, struct xz_buf *b)
 	} else {
 		s->allow_buf_error = false;
 	}
-
+	info_msg("d");
 	return ret;
 }
 

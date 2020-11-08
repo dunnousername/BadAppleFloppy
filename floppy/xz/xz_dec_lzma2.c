@@ -1101,11 +1101,12 @@ XZ_EXTERN enum xz_ret xz_dec_lzma2_run(struct xz_dec_lzma2 *s,
 	return XZ_OK;
 }
 
+struct xz_dec_lzma2 lzma2_dec;
+
 XZ_EXTERN struct xz_dec_lzma2 *xz_dec_lzma2_create(enum xz_mode mode,
 						   uint32_t dict_max)
 {
-	struct xz_dec_lzma2 x;
-	struct xz_dec_lzma2 *s = &x;
+	struct xz_dec_lzma2 *s = &lzma2_dec;
 	if (s == NULL)
 		return NULL;
 

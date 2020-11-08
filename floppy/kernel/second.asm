@@ -6,6 +6,7 @@ extern kernel_main
 extern timer_event
 extern keyboard_event
 global _debug_msg
+global get_esp
 global do_cli
 global do_sti
 global change_video_mode
@@ -37,6 +38,10 @@ _start:
     call _debug
 
     jmp hang
+
+get_esp:
+    mov eax, esp
+    ret
 
 _halt:
     pushf
@@ -195,6 +200,8 @@ irq13:
     call _debug_msg
     pop eax
 _die:
+    mov ebx, 0x80386F00
+    mov ecx, 0x31415926
     mov dx, 0xB004
     mov ax, 0x2000
     ; kill the CPU

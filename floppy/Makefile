@@ -1,7 +1,7 @@
 .PHONY: all clean blob second_stage xz
 all: image.bin
 
-CFLAGS := $(CFLAGS) -target i386-pc-none-elf -flto -Os
+CFLAGS := $(CFLAGS) -target i386-pc-none-elf
 
 image.bin: kernel.bin boot.bin
 	cat first_stage/boot.bin kernel.bin > image.bin
@@ -11,9 +11,12 @@ image.bin: kernel.bin boot.bin
 boot.bin:
 	$(MAKE) -C first_stage
 
-kernel.bin: blob second_stage xz
-	$(LD) --oformat binary -Ttext=0x100200 -e _start \
-		-o kernel.bin \
+kernel.bin: kernel.elf
+	$(OBJCOPY) -Obinary kernel.elf kernel.bin
+
+kernel.elf: blob second_stage xz
+	$(LD) -Ttext=0x100200 -e _start \
+		-o kernel.elf \
 		kernel/second.elf \
 		kernel/ckernel.elf \
 		kernel/music.elf \

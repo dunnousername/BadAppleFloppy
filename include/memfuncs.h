@@ -44,7 +44,7 @@ void *memcpy(void *dest, const void *src, long n) {
 }
 
 void *memmove(void *dest, const void *src, long n) {
-    memcpy(dest, src, n);
+    return memcpy(dest, src, n);
 }
 
 void *memset(void *s, int c, long n) {

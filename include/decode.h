@@ -75,7 +75,7 @@ void eight2two(uint8_t *src, uint8_t *dest, long len) {
     }
 }
 
-#define VRAM_SKIP (MAX_X * 20)
+#define VRAM_SKIP (((MAX_Y - REAL_MAX_Y) / 2) * MAX_X)
 #define VRAM_ADDR ((uint8_t *) 0xB8000)
 
 void copy_to_vmem(uint8_t *src) {

@@ -1,17 +1,19 @@
-.PHONY: all clean floppy test.encoder clean.floppy encoder clean.encoder run.encoder distclean.encoder
+.PHONY: all clean floppy test.encoder clean.floppy encoder clean.encoder
+.PHONY: run.encoder distclean.encoder encoder qemu qemu-monitor qemu-gdb
+.PHONY: lldb gdb
 all: floppy
 
-CFLAGS = $(CFLAGS) -target i386-pc-none-elf
+CFLAGS = $(CFLAGS) -target i386-pc-none-elf -Os
 LD ?= ld.lld
 OBJCOPY ?= llvm-objcopy
 
-floppy: $(if $(wildcard encoder/encoded.bin),,encoder/encoded.bin)
+floppy: $(if $(wildcard encoder/encoded.bin),,encoder)
 	$(MAKE) -C floppy
 
 clean.floppy:
 	$(MAKE) -C floppy clean
 
-encoder/encoded.bin:
+encoder:
 	$(MAKE) -C encoder
 
 clean.encoder:
@@ -26,3 +28,18 @@ test.encoder:
 clean: clean.floppy clean.encoder
 
 distclean: clean distclean.encoder
+
+qemu:
+	qemu-system-i386 -debugcon stdio -m 64M -fda bin/floppy.img
+
+qemu-monitor:
+	qemu-system-i386 -monitor stdio -m 64M -fda bin/floppy.img
+
+qemu-gdb:
+	qemu-system-i386 -s -S -debugcon stdio -m 64M -fda bin/floppy.img
+
+gdb:
+	gdb floppy/kernel.elf
+
+lldb:
+	lldb floppy/kernel.elf
